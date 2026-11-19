@@ -7,10 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
-:root{--bg:#eceff3;--panel:#fff;--ink:#1b2838;--mute:#5d6b7c;--line:#c5ced9;--wall:#8693a3;
---vacant:#1f8f7e;--occupied:#2f64c9;--dirty:#c98a14;--cleaning:#7a55c7;--ooo:#c7384d;
+:root{color-scheme:dark;--bg:#000;--panel:#0e0e0e;--ink:#fff;--mute:#a3a3a3;--line:#3a3a3a;--wall:#d4d4d4;
+--vacant:#3ddc77;--occupied:#ffd84a;--dirty:#ff5b5b;--cleaning:#ff5b5b;--ooo:#9a9a9a;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root{--bg:#121821;--panel:#1b2330;--ink:#e6ebf2;--mute:#97a4b5;--line:#344155;--wall:#6f7f93;--vacant:#3fc2ad;--occupied:#6e9bf0;--dirty:#e6ae45;--cleaning:#a58aea;--ooo:#ee6b7d}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 Figtree,system-ui,-apple-system,Segoe UI,sans-serif}
 button,input,textarea{font:inherit;color:inherit}
@@ -48,7 +47,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;padding:8px
 aside,.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
 aside{position:sticky;top:12px}
 aside h2{margin:0;font-size:24px}.sub{color:var(--mute);margin:0 0 10px}
-.pill{display:inline-flex;gap:6px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--c) 18%,var(--panel));color:var(--c);font-weight:700;font-size:13px;border:1px solid var(--c)}
+.pill{display:inline-flex;gap:6px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--c) 18%,var(--panel));color:var(--ink);font-weight:700;font-size:13px;border:1px solid var(--c)}
 .view{width:100%;height:auto;margin:12px 0;display:block}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 12px}
 .seg button{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;text-align:left;display:flex;gap:8px;align-items:center}
@@ -72,7 +71,7 @@ textarea{width:100%;min-height:56px;resize:vertical}
 .acts .go{padding:12px 16px}
 .login{max-width:360px;margin:12vh auto;padding:0 16px}
 .login .card{display:grid;gap:10px}
-.err{color:var(--ooo);font-size:14px;min-height:1.2em}
+.err{color:var(--dirty);font-size:14px;min-height:1.2em}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:9}
 :focus-visible{outline:3px solid var(--occupied);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -110,11 +109,13 @@ const SB_URL='https://afsrhhmluryouwuzqyqn.supabase.co';
 const SB_KEY='sb_publishable_C90uGSdJMCC5mH2dafxPQg_vNTIc-ep';
 const sb=supabase.createClient(SB_URL,SB_KEY);
 const ST={
- vacant:{label:'Vacant, clean',c:'var(--vacant)',ic:'✓'},
- occupied:{label:'Occupied',c:'var(--occupied)',ic:'●'},
- dirty:{label:'Needs cleaning',c:'var(--dirty)',ic:'!'},
- cleaning:{label:'Being cleaned',c:'var(--cleaning)',ic:'◐'},
- ooo:{label:'Out of order',c:'var(--ooo)',ic:'✕'}};
+ ready:{label:'Ready',c:'var(--vacant)',ic:'✓'},
+ dueout:{label:'Due out',c:'var(--occupied)',ic:'→'},
+ cleaning:{label:'Cleaning',c:'var(--cleaning)',ic:'◐'},
+ oos:{label:'Out of service',c:'var(--ooo)',ic:'✕'}};
+const DB2UI={vacant:'ready',occupied:'dueout',dirty:'cleaning',cleaning:'cleaning',ooo:'oos'};
+const UI2DB={ready:'vacant',cleaning:'dirty',oos:'ooo'};
+const disp=r=>DB2UI[r.status];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const iso=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toLocaleDateString('en-CA')};
@@ -169,7 +170,7 @@ async function say(r,text){
  if(error)toast(error.message)}
 
 function matches(r){
- if(filter&&r.status!==filter)return false;
+ if(filter&&disp(r)!==filter)return false;
  if(query){const q=query.toLowerCase();return r.number.includes(q)||r.guest.toLowerCase().includes(q)}
  return true}
 
@@ -180,15 +181,15 @@ function renderAll(keepTyping){
  if(!(keepTyping&&document.activeElement&&['nt','mt','gn'].includes(document.activeElement.id)))renderPanel()}
 
 function renderChips(){
- $('chips').innerHTML=Object.entries(ST).map(([k,v])=>`<button class="chip" style="--c:${v.c}" data-k="${k}" aria-pressed="${filter===k}"><i></i>${v.label} <b>${rooms.filter(r=>r.status===k).length}</b></button>`).join('');
+ $('chips').innerHTML=Object.entries(ST).map(([k,v])=>`<button class="chip" style="--c:${v.c}" data-k="${k}" aria-pressed="${filter===k}"><i></i>${v.label} <b>${rooms.filter(r=>disp(r)===k).length}</b></button>`).join('');
  $('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{filter=filter===b.dataset.k?null:b.dataset.k;renderAll()})}
 
 function renderTabs(){
  const floors=[...new Set(rooms.map(r=>r.floor))].sort((a,b)=>a-b);
  let h='';
- if(me.role!=='housekeeping')h+=floors.map(f=>{const n=rooms.filter(r=>r.floor===f&&r.status==='dirty').length;
+ if(me.role!=='housekeeping')h+=floors.map(f=>{const n=rooms.filter(r=>r.floor===f&&disp(r)==='cleaning').length;
   return `<button role="tab" data-f="${f}" aria-selected="${view==='plan'&&f===floor}">Floor ${f}${n?` <b style="color:var(--dirty)">${n}</b>`:''}</button>`}).join('');
- const todo=rooms.filter(r=>r.status==='dirty'||r.status==='cleaning').length;
+ const todo=rooms.filter(r=>disp(r)==='cleaning').length;
  h+=`<span class="gap"></span><button role="tab" data-f="hk" aria-selected="${view==='hk'}">Housekeeping list (${todo})</button>`;
  $('tabs').innerHTML=h;
  $('tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
@@ -196,7 +197,7 @@ function renderTabs(){
 
 function renderPlan(){
  const idx=r=>parseInt(r.number)-r.floor*100;
- const tile=r=>{const v=ST[r.status];
+ const tile=r=>{const v=ST[disp(r)];
   return `<button class="room${matches(r)?'':' dim'}" style="--c:${v.c}" data-id="${r.id}" aria-pressed="${sel===r.id}" aria-label="Room ${esc(r.number)}, ${esc(r.type)}, ${v.label}${r.guest?', '+esc(r.guest):''}">
   <span class="ic" aria-hidden="true">${v.ic}</span><span><span class="n">${esc(r.number)}</span><br><span class="t">${esc(r.type)}</span></span><span class="g">${esc(r.guest)||v.label}</span></button>`};
  const fr=rooms.filter(r=>r.floor===floor);
@@ -206,27 +207,26 @@ function renderPlan(){
 
 function lastMsg(r){return events.find(e=>e.room_id===r.id&&e.kind==='message')}
 function renderHK(){
- const list=rooms.filter(r=>r.status==='dirty'||r.status==='cleaning').sort((a,b)=>a.floor-b.floor||a.number.localeCompare(b.number));
+ const list=rooms.filter(r=>disp(r)==='cleaning').sort((a,b)=>a.floor-b.floor||a.number.localeCompare(b.number));
  if(!list.length){$('hk').innerHTML='<div class="card empty">Nothing to clean right now. New checkouts will appear here instantly.</div>';return}
  let h='',f=null;
  list.forEach(r=>{
   if(r.floor!==f){f=r.floor;h+=`<h3>Floor ${f}</h3>`}
-  const v=ST[r.status],m=lastMsg(r);
+  const v=ST[disp(r)],m=lastMsg(r);
   h+=`<div class="card hkc" style="--c:${v.c}"><div><span class="n">${esc(r.number)}</span> <span class="mute">${esc(r.type)} · ${v.label}</span>
    ${r.note?`<div class="mute">Note: ${esc(r.note)}</div>`:''}${m?`<div class="mute">“${esc(m.message)}” – ${esc(staff[m.user_id]?.name||'Staff')}</div>`:''}</div>
-   <div class="acts">${r.status==='dirty'?`<button class="go" data-a="start" data-id="${r.id}">Start cleaning</button>`:`<button class="go" data-a="done" data-id="${r.id}">Mark clean</button>`}
+   <div class="acts"><button class="go" data-a="done" data-id="${r.id}">Mark clean</button>
    <button class="go alt" data-a="msg" data-id="${r.id}">Message</button><button class="go alt" data-a="ooo" data-id="${r.id}">Report problem</button></div></div>`});
  $('hk').innerHTML=h}
 $('hk').onclick=e=>{
  const b=e.target.closest('button[data-a]');if(!b)return;
  const r=rooms.find(x=>x.id===b.dataset.id),a=b.dataset.a;
- if(a==='start')setRoom(r,{status:'cleaning'});
  if(a==='done')setRoom(r,{status:'vacant'});
  if(a==='msg'){const t=prompt('Message for room '+r.number+':');if(t&&t.trim())say(r,t.trim())}
  if(a==='ooo'){const t=prompt('What’s the problem in room '+r.number+'?');if(t&&t.trim())setRoom(r,{status:'ooo',note:t.trim()},'Problem reported: '+t.trim())}}
 
 function roomSVG(r){
- const c=ST[r.status].c,w='stroke="var(--wall)" stroke-width="3"',f='fill="var(--bg)" stroke="var(--wall)" stroke-width="1.5"';
+ const c=ST[disp(r)].c,w='stroke="var(--wall)" stroke-width="3"',f='fill="var(--bg)" stroke="var(--wall)" stroke-width="1.5"';
  const bed=(x,y,wd,h)=>`<rect x="${x}" y="${y}" width="${wd}" height="${h}" rx="4" ${f}/><rect x="${x+4}" y="${y+4}" width="${wd-8}" height="12" rx="3" fill="var(--line)"/>`;
  const bath=(x,y,wd,h,l=1)=>`<rect x="${x}" y="${y}" width="${wd}" height="${h}" ${f}/><circle cx="${x+14}" cy="${y+h-16}" r="8" ${f}/><rect x="${x+wd-30}" y="${y+6}" width="24" height="${Math.min(40,h-12)}" rx="3" ${f}/>${l?`<text x="${x+wd/2}" y="${y+14}" font-size="9" text-anchor="middle" fill="var(--mute)">Bath</text>`:''}`;
  const desk=`<rect x="170" y="112" width="58" height="22" rx="3" ${f}/><text x="199" y="127" font-size="9" text-anchor="middle" fill="var(--mute)">Desk</text>`;
@@ -241,22 +241,22 @@ function logHTML(r){
  if(!ev.length)return '<p class="hint">No activity yet.</p>';
  return '<ul class="log">'+ev.map(e=>{
   const who=esc(staff[e.user_id]?.name||'Staff');
-  const txt=e.kind==='status'?'<span class="st">'+e.message.split(' -> ').map(k=>ST[k]?.label||k).join(' → ')+'</span>':'<span class="msg">'+esc(e.message)+'</span>';
+  const txt=e.kind==='status'?'<span class="st">'+e.message.split(' -> ').map(k=>ST[DB2UI[k]]?.label||k).join(' → ')+'</span>':'<span class="msg">'+esc(e.message)+'</span>';
   return `<li><span class="tm">${fmtT(e.created_at)}</span> <b>${who}</b> ${txt}</li>`}).join('')+'</ul>'}
 
 function renderPanel(){
  const p=$('panel'),r=rooms.find(x=>x.id===sel);
  if(!r){p.innerHTML='<div class="empty">Select a room to see its layout, status and messages.</div>';return}
- const v=ST[r.status];let stay='';
+ const v=ST[disp(r)];let stay='';
  if(r.status==='occupied')stay=`<dl class="stay"><dt>Guest</dt><dd>${esc(r.guest)}</dd><dt>Arrived</dt><dd>${fmtD(r.check_in)}</dd><dt>Departs</dt><dd>${fmtD(r.check_out)}</dd></dl><button class="go alt" id="co">Check out guest</button>`;
  else if(r.status==='vacant')stay=`<label for="gn">Check in a guest</label><div class="row"><input id="gn" placeholder="Guest surname"><button class="go" id="ci">Check in</button></div>`;
  p.innerHTML=`<h2>Room ${esc(r.number)}</h2><p class="sub">Floor ${r.floor} · ${esc(r.type)}</p><span class="pill" style="--c:${v.c}">${v.ic} ${v.label}</span>${roomSVG(r)}${stay}
- <label>Set status</label><div class="seg">${Object.entries(ST).filter(([k])=>k!=='occupied').map(([k,s])=>`<button style="--c:${s.c}" data-k="${k}" aria-pressed="${r.status===k}"><i></i>${s.label}</button>`).join('')}</div>
+ <label>Set status</label><div class="seg">${Object.entries(ST).filter(([k])=>k!=='dueout').map(([k,s])=>`<button style="--c:${s.c}" data-k="${k}" aria-pressed="${disp(r)===k}"><i></i>${s.label}</button>`).join('')}</div>
  <label for="nt">Room note</label><textarea id="nt">${esc(r.note)}</textarea>
  <label for="mt">Message the team about this room</label><div class="row"><input id="mt" placeholder="e.g. Early check-in, please prioritize"><button class="go" id="send">Send</button></div>${logHTML(r)}`;
  p.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
   if(r.status==='occupied'&&!confirm('This room has a guest. Change its status anyway?'))return;
-  const k=b.dataset.k;setRoom(r,{status:k,...(r.status==='occupied'?{guest:'',check_in:null,check_out:null}:{})})});
+  const k=b.dataset.k;setRoom(r,{status:UI2DB[k],...(r.status==='occupied'?{guest:'',check_in:null,check_out:null}:{})})});
  const ci=$('ci');if(ci)ci.onclick=()=>{const g=$('gn').value.trim();if(!g)return $('gn').focus();setRoom(r,{status:'occupied',guest:g,check_in:iso(0),check_out:iso(2)})};
  const co=$('co');if(co)co.onclick=()=>setRoom(r,{status:'dirty',guest:'',check_in:null,check_out:null});
  $('nt').onchange=e=>setRoom(r,{note:e.target.value});
